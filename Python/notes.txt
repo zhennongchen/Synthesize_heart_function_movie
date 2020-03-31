@@ -1,0 +1,3 @@
+all avi are separated in folder "train" and "test"
+all time frame images are saved in folder "train_image" and "test_image"
+all extracted features (40 time frame for one avi) are saved in folder "sequences"

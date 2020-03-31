@@ -1,0 +1,27 @@
+Patient set: 94 patients
+
+Data/Movie set: 
+for each patient, use time_0_segmentation as the template, generate 10 normal LV function 
+(random EF between 70-90) and 10 abnormal LV function (random EF between 10-30)
+All deformation are linear and uniform.
+Each surface rendering movie has 20 time frames as one cardiac cycle.
+result in 20 * 94 = 1880 movies
+
+Training/Test split:
+67 patients and 67*20 = 1440 movies in Training
+27 patients and 27*20 = 540 movies in Test
+
+Network Design:
+Extract features from each time frame picture by InceptionV3.
+Combine all features from 20 time frames, resulting in (20,2048) features.
+then use combined-features as input for LSTM to output two classess (normal vs. abnormal)
+
+Hyperparameter choice:
+learning rate = 1e-5 and decay = 1e-6 for adam optimizer
+batch size = 32
+epoch = 100
+
+Result:
+trainig_accuracy achieves 1 at epoch 44
+validation_accuracy achieves highest value as 0.98 at epoch 31.
+

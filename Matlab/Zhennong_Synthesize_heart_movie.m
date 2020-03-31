@@ -3,6 +3,8 @@ clear all
 addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/NIfTI image processing/');
 addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/iso2mesh');
 addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/functions');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/angle_info');
+
 load('patient_list.mat')
 %%
 % patient_class: "ucsd_bivent", patient_num = 1~17
@@ -12,8 +14,11 @@ load('patient_list.mat')
 % patient_class: "ucsd_siemens", patient_num = 1~11
 % patient_class: "ucsd_tavr_1", patient_num = 1~24
 % patient_class: "ucsd_toshiba", patient_num = 1~21
-patient_class = "ucsd_bivent";
-patient_num = 1; % the Patinet no. in that patient class
+
+for patient_num = 16:21 
+    clear Mesh base_lim fv info E smoothing iii
+patient_class = "ucsd_toshiba";
+%patient_num = 1; % the Patinet no. in that patient class
 
 % get the patient_class, p_class and patient_id, p_id
 [p_class,p_id] = find_patient(patient_list,patient_class,patient_num);
@@ -22,19 +27,21 @@ image_name = ['/Volumes/McVeighLab/projects/Zhennong/AI/AI_datasets/',p_class,'/
 
 info.tf = 20; %number of time frames to systole
 info.iso_res = 0.5; %Isotropic resolution for rotation (prior to rotation)
-%% get patient_specific rotation angle
+% get patient_specific rotation angle
 angle_file_name = ['/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/angle_info/',p_class,'_',p_id,'_angle.mat'];
 load(angle_file_name);
-%% Reading Image
+info.th_rot_z = th_rot_z;
+info.th_rot_x = th_rot_x;
+% Reading Image
 clear I
 print = 1; %flag for generating a slice of the image
 
 [I,final_limit] = Reading_Image(image_name,info,print,5);
 
 disp('Done Prepping Image');
-
+close all
 %clear p0 print fr image_name
-%%
+%
 info.downsampling = 0; %flag for downsampling
 xmax = final_limit(1);xmin = final_limit(2);
 ymax = final_limit(3);ymin = final_limit(4);
@@ -54,7 +61,7 @@ smoothing.switch = 1;
 smoothing.iter = linspace(0,4,info.tf);
 smoothing.alpha = linspace(0,0.4,info.tf);
 smoothing.method = 'lowpass';
-%% Extracting mesh
+% Extracting mesh
 
 print = 1;
 info.mesh_thresh = 0.5; %Threshold for cleaning up post runnning the averaging filter
@@ -62,10 +69,10 @@ info.mesh_thresh = 0.5; %Threshold for cleaning up post runnning the averaging f
 fv = Mesh_Extraction(I,info,print);
 
 disp('Done Extracting the mesh');
-
+close all
 clear print
 
-%% Infarct Model
+% Infarct Model
 clear infarct
 info.infarct = 0; %flag for strain model for infarction
 
@@ -99,15 +106,15 @@ else
     disp('No infarct');
 end
 
-%% Infarct Strain model
+% Infarct Strain model
 % set EF
 % normal LV has EF from 70 to 90
 % abnormal LV has EF from 10 to 30
 
-for jj = 1:40
+for jj = 1:20
     
     info.ef_normal = 70; % Computed from Blender
-    if jj <21
+    if jj <11
         info.ef_desired = rand()*20 + 70;
         
     else
@@ -128,8 +135,8 @@ for jj = 1:40
             [Mesh.Vertices(:,:,i), base_lim(i), Mesh.NoSmooth_Verts(:,:,i)] = Strain_Model_InfarctNew(fv,info,E,infarct,smoothing,i);
      end
     else
-        for i = 1:info.tf
-        [Mesh.Vertices(:,:,i), base_lim(i), Mesh.NoSmooth_Verts(:,:,i)] = Strain_Model(fv,info,E,smoothing,i);
+        for iii = 1:info.tf
+        [Mesh.Vertices(:,:,iii), base_lim(iii), Mesh.NoSmooth_Verts(:,:,iii)] = Strain_Model(fv,info,E,smoothing,iii);
         end
     end    
 
@@ -171,4 +178,6 @@ if makemovie == 1
     close all
     disp(['Done making movie ',num2str(jj)])
 end
+end
+    disp(['done patient num ',num2str(patient_num)])
 end
