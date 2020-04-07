@@ -1,26 +1,15 @@
 %% 
 clear all
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/NIfTI image processing/');
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/iso2mesh');
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/functions');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/NIfTI image processing/');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/iso2mesh');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/functions');
 addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/angle_info');
 
-load('patient_list.mat')
+load('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/patient_list.mat')
 %%
-% patient_class: "ucsd_bivent", patient_num = 1~17
-% patient_class: "ucsd_ccta", patient_num = 1
-% patient_class: "ucsd_lvad", patient_num = 1
-% patient_class: "ucsd_pv", patient_num = 1~19
-% patient_class: "ucsd_siemens", patient_num = 1~11
-% patient_class: "ucsd_tavr_1", patient_num = 1~24
-% patient_class: "ucsd_toshiba", patient_num = 1~21
-
-for patient_num = 6:17
-    clear Mesh base_lim fv info E smoothing iii
+clear point_list
+patient_num = 1;
 patient_class = "ucsd_bivent";
-%patient_num = 1; % the Patinet no. in that patient class
-
-% get the patient_class, p_class and patient_id, p_id
 [p_class,p_id] = find_patient(patient_list,patient_class,patient_num);
 fr = 0;
 image_name = ['/Volumes/McVeighLab/projects/Zhennong/AI/AI_datasets/',p_class,'/',p_id,'/seg-nii/',num2str(fr),'.nii.gz'];
@@ -32,16 +21,19 @@ angle_file_name = ['/Users/zhennongchen/Documents/GitHub/Synthesize_heart_functi
 load(angle_file_name);
 info.th_rot_z = th_rot_z;
 info.th_rot_x = th_rot_x;
-% Reading Image
+%% Reading Image
 clear I
 print = 1; %flag for generating a slice of the image
 
-[I,final_limit] = Reading_Image(image_name,info,print,5);
+read_size = ['/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/reading_image_info/',p_class,'_',p_id,'_read.mat'];
+load(read_size)
+
+[I,final_limit] = Reading_Image(image_name,info,print,Reading_image_size);
 
 disp('Done Prepping Image');
 close all
-%clear p0 print fr image_name
-%
+
+%%
 info.downsampling = 0; %flag for downsampling
 xmax = final_limit(1);xmin = final_limit(2);
 ymax = final_limit(3);ymin = final_limit(4);
@@ -61,7 +53,7 @@ smoothing.switch = 1;
 smoothing.iter = linspace(0,4,info.tf);
 smoothing.alpha = linspace(0,0.4,info.tf);
 smoothing.method = 'lowpass';
-% Extracting mesh
+%% Extracting mesh
 
 print = 1;
 info.mesh_thresh = 0.5; %Threshold for cleaning up post runnning the averaging filter
@@ -71,10 +63,15 @@ fv = Mesh_Extraction(I,info,print);
 disp('Done Extracting the mesh');
 close all
 clear print
-
-% Infarct Model
+%% Infarct Model
 clear infarct
-info.infarct = 0; %flag for strain model for infarction
+infarct_location = ['/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/infarct_location_info/',p_class,'_',p_id,'_infarct_location.mat'];
+load(infarct_location)
+idx = randperm(8);
+disp(idx(1));
+center_raw = point_list(idx(1),:);
+%
+info.infarct = 1; %flag for strain model for infarction
 
 if info.infarct
     
@@ -83,10 +80,11 @@ if info.infarct
 %         infarct.center = [15, 27, 5];  %old value
 %         infarct.center = [3 26 17]; %for 1mm resolution
     else
-        infarct.center  = [65, 120, 16.5]; %anterior: ; :septum: [24.5 118 75];
+        infarct.center  = [center_raw(1) center_raw(3) center_raw(2)]; %anterior: ; :septum: [24.5 118 75];
+        % click to get [x,y,z], center = [x,z,y]
     end    
-
-    infarct.center_scaling = 1 - 0.65; %Enter (1 - %infarct) %Hypo = 0.7; xxxx(NOT USED )subtle hypo = 0.45xxxxxx; subtle hypo = 0.40
+    
+    infarct.center_scaling = 1 - 0.9; %Enter (1 - %infarct) % hypokinesia = 80% reduction in strain and subtle hypokinesia = 40% reduction in strain
     infarct.taper = '2D Sigmoid'; % 1) 'Gaussian' for smooth taper off; 2) 'Table-top', 3) 'Linear' and 4) '2D Sigmoid'
     infarct.plot_taper = 0; %flag for plotting taper function
     
@@ -95,7 +93,7 @@ if info.infarct
     infarct.size = infarct.PIZ + infarct.core;
     %enter radius in mm eg:'10' %40(aha1),27(aha2),20(aha3),13.5(aha4); -size severity sigmoid
     
-    infarct = Infarct_Model(fv,infarct,info);
+    infarct = Infarct_Model_no_manul_input(fv,infarct,info);
     
     if strcmp(infarct.taper,'2D Sigmoid')
         infarct = Surface_Flattening(fv,infarct);
@@ -105,30 +103,23 @@ if info.infarct
 else
     disp('No infarct');
 end
-
-% Infarct Strain model
+close all
+%% Infarct Strain model
 % set EF
 % normal LV has EF from 70 to 90
 % abnormal LV has EF from 10 to 30
 
-for jj = 1:40
+info.ef_normal = 70; % Computed from Blender
+info.ef_desired = 75;
     
-    info.ef_normal = 70; % Computed from Blender
-    if jj <21
-        info.ef_desired = rand()*20 + 70;
-        
-    else
-        info.ef_desired = rand()*20 + 10;
-    end
-    
-    info.EF = info.ef_desired/info.ef_normal; % 1 - Normal EF; 0 - No EF
-    disp(info.ef_desired)
-    disp(info.EF)
-    %Computing the strain functions
-    E = Strain_Functions(fv,info); % can change strain values in this strain_functions.m 
+info.EF = info.ef_desired/info.ef_normal; % 1 - Normal EF; 0 - No EF
+disp(info.ef_desired)
+disp(info.EF)
+%Computing the strain functions
+E = Strain_Functions(fv,info); % can change strain values in this strain_functions.m 
 
-    %Flag for printing meshes
-    info.print = 0;
+%Flag for printing meshes
+info.print = 0;
 
     if info.infarct == 1
      for i = 1:info.tf
@@ -144,14 +135,12 @@ for jj = 1:40
     Mesh.NoSmooth_Verts(:,:,1) = Mesh.Vertices(:,:,1);
     Mesh.Faces = fv.faces;
     disp('Strain model finished');
-
-    
-% Making Systolic contraction movie of endocardium
+%% Making Systolic contraction movie of endocardium
 
 makemovie = 1;
 
 if makemovie == 1
-    save_path = ['/Volumes/McVeighLab/projects/Zhennong/Video Prediction/Synthesized_EF_movie/',p_class,'_',p_id,'_',num2str(round(info.ef_desired,2)),'%'];
+    save_path = ['/Volumes/McVeighLab/projects/Zhennong/Video_Prediction/Synthesized_Infarction_movie/',p_class,'_',p_id,'_',num2str(round(1-infarct.center_scaling,2)),'_',num2str(round(info.ef_desired,2)),'%'];
     writerObj = VideoWriter(save_path,'Motion JPEG AVI');
     writerObj.FrameRate = 20;
     
@@ -176,7 +165,6 @@ if makemovie == 1
    
     close(writerObj);
     close all
-    disp(['Done making movie ',num2str(jj)])
-end
-end
-end
+    
+end 
+

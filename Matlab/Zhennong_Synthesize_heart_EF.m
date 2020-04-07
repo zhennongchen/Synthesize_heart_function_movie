@@ -1,8 +1,8 @@
 %% 
 clear all
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/NIfTI image processing/');
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/iso2mesh');
-addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/functions');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/NIfTI image processing/');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/iso2mesh');
+addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matlab/functions');
 addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/angle_info');
 
 load('patient_list.mat')
@@ -15,7 +15,7 @@ load('patient_list.mat')
 % patient_class: "ucsd_tavr_1", patient_num = 1~24
 % patient_class: "ucsd_toshiba", patient_num = 1~21
 
-for patient_num = 16:21 
+for patient_num = 16
     clear Mesh base_lim fv info E smoothing iii
 patient_class = "ucsd_toshiba";
 %patient_num = 1; % the Patinet no. in that patient class
@@ -111,8 +111,8 @@ end
 % normal LV has EF from 70 to 90
 % abnormal LV has EF from 10 to 30
 
-for jj = 1:20
-    
+for jj = 11
+  
     info.ef_normal = 70; % Computed from Blender
     if jj <11
         info.ef_desired = rand()*20 + 70;
@@ -151,7 +151,7 @@ for jj = 1:20
 makemovie = 1;
 
 if makemovie == 1
-    save_path = ['/Volumes/McVeighLab/projects/Zhennong/Video Prediction/Synthesized_EF_movie/',p_class,'_',p_id,'_',num2str(round(info.ef_desired,2)),'%'];
+    save_path = ['/Volumes/McVeighLab/projects/Zhennong/Video_Prediction/Synthesized_EF_movie/movie/',p_class,'_',p_id,'_',num2str(round(info.ef_desired,2)),'%'];
     writerObj = VideoWriter(save_path,'Motion JPEG AVI');
     writerObj.FrameRate = 20;
     

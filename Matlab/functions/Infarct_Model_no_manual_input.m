@@ -1,4 +1,4 @@
-function infarct = Infarct_Model(fv,infarct,info)
+function infarct = Infarct_Model_no_manual_input(fv,infarct,info)
 
 %Infarct Location: Mid_Anterior
 %Infarct Plane:    x-y; y is the Long Axis of the ventricle
@@ -38,13 +38,14 @@ ylabel('y');
 zlabel('z');
 title('Choose desired mesh object...','FontSize',35); ylim([0 info.y_lim]); xlim([0 info.x_lim]); zlim([0 info.z_lim]);
 
-%Specifying colors for user selected choice
-for j = 1:numel(facecell)
-    fprintf([num2str(j),'. ',col{j},'\n'])
-end
-choice = str2double(input('Choose mesh Object: ','s'));
+% %Specifying colors for user selected choice
+% for j = 1:numel(facecell)
+%     fprintf([num2str(j),'. ',col{j},'\n'])
+% end
+% choice = str2double(input('Choose mesh Object: ','s'));
 
 %Choosing only the faces wanted by the user
+choice = 1;
 infarct.Faces = facecell{choice};
 
 %Extracting the vertices corresponding to those faces
