@@ -9,10 +9,18 @@ main_folder = os.path.join(cg.oct_main_dir)
 
 a_list = ff.find_all_target_files(['*'],os.path.join(main_folder,'sequences'))
 
+# for a in a_list:
+#     r = np.load(a,allow_pickle = True)
+#     shape = r.shape
+#     if shape[0] != 20 or shape[1] != 2048:
+#         print(a,shape)
+
 for a in a_list:
     r = np.load(a,allow_pickle = True)
     shape = r.shape
-    if shape[0] != 20 or shape[1] != 2048:
-        print(a,shape)
-#a = np.load(os.path.join(main_folder,'sequences/ucsd_bivent_CVC1707030901_10.69-20-features.npy'),allow_pickle=True)
-#print(a.shape)
+    a1 = r[0]
+    a2 = r[9]
+    aa = np.concatenate((a1,a2)).reshape(2,a1.shape[0])
+    print(aa.shape)
+
+    break

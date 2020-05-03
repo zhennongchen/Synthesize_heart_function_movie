@@ -12,7 +12,7 @@ from collections import deque
 import sys
 
 class ResearchModels():
-    def __init__(self, nb_classes, model, seq_length,
+    def __init__(self, nb_classes, model, seq_length,learning_rate,learning_decay,
                  saved_model=None, features_length=2048):
         """
         `model` = one of:
@@ -46,6 +46,10 @@ class ResearchModels():
             print("Loading LSTM model.")
             self.input_shape = (seq_length, features_length)
             self.model = self.lstm()
+        elif model == 'lstm_regression':
+            print("Loading LSTM regression model.")
+            self.input_shape = (seq_length, features_length)
+            self.model = self.lstm_regression()
         elif model == 'lrcn':
             print("Loading CNN-LSTM model.")
             self.input_shape = (seq_length, 80, 80, 3)
@@ -67,8 +71,11 @@ class ResearchModels():
             sys.exit()
 
         # Now compile the network.
-        optimizer = Adam(lr=1e-5, decay=1e-6)
-        self.model.compile(loss='categorical_crossentropy', optimizer=optimizer,
+        optimizer = Adam(lr=learning_rate, decay=learning_decay)
+        if model == 'lstm_regression':
+            self.model.compile(loss='mae', optimizer=optimizer)
+        else:
+            self.model.compile(loss='categorical_crossentropy', optimizer=optimizer,
                            metrics=metrics)
 
         print(self.model.summary())
@@ -85,7 +92,21 @@ class ResearchModels():
         model.add(Dense(512, activation='relu'))
         model.add(Dropout(0.5))
         model.add(Dense(self.nb_classes, activation='softmax'))
+        return model
 
+    def lstm_regression(self):
+        """use lstm regression to predict EF"""
+        # Model.
+        model = Sequential()
+        model.add(LSTM(2048, activation='tanh',recurrent_activation='sigmoid',
+                    return_sequences=False, # 2048 = the units, which is the diemnsionality of the output space. It should be equal to input dimension since each input gets one corresponding ouput
+                    input_shape=self.input_shape,
+                    dropout=0.5))
+        model.add(Dense(512, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(1, activation='relu'))
         return model
 
     def lrcn(self):

@@ -21,16 +21,26 @@ for d in data.data:
 
 
 
-def train(data_type, seq_length, model, saved_model=None,
+def train(data_type, seq_length, model, learning_rate,learning_decay,saved_model=None,
           class_limit=None, image_shape=None,
           load_to_memory=False, batch_size=32, nb_epoch=100):
     print('trainig_num is ', training_num)
+
+    if model == 'lstm_regression':
+        regression = 1
+        monitor_par = 'val_loss'
+        sequence_len = 2
+    else:
+        regression = 0
+        monitor_par = 'val_acc'
+        sequence_len = seq_length
+
     # Helper: Save the model.
     checkpointer = ModelCheckpoint(
         filepath=os.path.join(main_folder, 'checkpoints',model, model + '-{epoch:03d}.hdf5'),
         #filepath=os.path.join(main_folder, 'checkpoints',model, model + '-' + data_type + \
             #'.{epoch:03d}-{val_loss:.3f}.hdf5'),
-        monitor='val_acc',
+        monitor=monitor_par,
         verbose=1,
         save_best_only=True)
 
@@ -62,7 +72,6 @@ def train(data_type, seq_length, model, saved_model=None,
     #steps_per_epoch = (len(data.data) * 0.7) // batch_size
     steps_per_epoch = training_num // batch_size
     print('step is: %d'%steps_per_epoch)
-
     if load_to_memory:
         # Get data.
         X, y = data.get_all_sequences_in_memory('train', data_type)
@@ -70,11 +79,11 @@ def train(data_type, seq_length, model, saved_model=None,
     else:
        
         # Get generators.
-        generator = data.frame_generator(batch_size, 'train', data_type)
-        val_generator = data.frame_generator(batch_size, 'test', data_type)
+        generator = data.frame_generator(batch_size, 'train', data_type,regression)
+        val_generator = data.frame_generator(batch_size, 'test', data_type,regression)
 
     # Get the model.
-    rm = ResearchModels(len(data.classes), model, seq_length, saved_model)
+    rm = ResearchModels(len(data.classes), model, sequence_len, learning_rate,learning_decay,saved_model)
 
     # Fit!
     if load_to_memory:
@@ -105,13 +114,15 @@ def main():
     """These are the main training settings. Set each before running
     this file."""
     # model can be one of lstm, lrcn, mlp, conv_3d, c3d
-    model = 'lstm'
+    model = 'lstm_regression'
     saved_model = None  # None or weights file
     class_limit = None  # int, can be 1-101 or None
     seq_length = 20
     load_to_memory = False  # pre-load the sequences into memory
     batch_size = 32
-    nb_epoch = 100
+    nb_epoch = 200
+    learning_rate = 1e-4
+    learning_decay = 1e-5
 
     folder_name = os.path.join(main_folder,'checkpoints',model)
     os.makedirs(folder_name,exist_ok=True)
@@ -120,14 +131,14 @@ def main():
     if model in ['conv_3d', 'c3d', 'lrcn']:
         data_type = 'images'
         image_shape = (80, 80, 3)
-    elif model in ['lstm', 'mlp']:
+    elif model in ['lstm', 'lstm_regression','mlp']:
         data_type = 'features'
         image_shape = None
     else:
         raise ValueError("Invalid model. See train.py for options.")
     
     print('start_to_train')
-    hist = train(data_type, seq_length, model, saved_model=saved_model,
+    hist = train(data_type, seq_length, model, learning_rate,learning_decay,saved_model=saved_model,
           class_limit=class_limit, image_shape=image_shape,
           load_to_memory=load_to_memory, batch_size=batch_size, nb_epoch=nb_epoch)
     

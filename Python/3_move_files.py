@@ -60,9 +60,9 @@ def copy_files(main_path,file_groups):
             print(filename)
             ef = float(filename.split('_')[-1].split('%')[0])
 
-            if ef <= 30:
+            if ef <= 40:
                 classname = 'abnormal'
-            elif ef >= 70:
+            elif ef >= 50:
                 classname = 'normal'
             else:
                 print('Error EF!')

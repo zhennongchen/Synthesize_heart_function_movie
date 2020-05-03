@@ -155,7 +155,7 @@ class DataSet():
     # Generator is not a collection, it stops with yield and returns to where it was left in the next call. 
     # Thus, it does not requires the use of a lot of memory. 
     # def + yield = generator; generator = def_name(); then use next(generator) to call generator'''
-    def frame_generator(self, batch_size, train_test, data_type):
+    def frame_generator(self, batch_size, train_test, data_type,regression):
         """Return a generator that we can use to train on. There are
         a couple different things we can return:
 
@@ -169,7 +169,7 @@ class DataSet():
 
         while 1: # it means next time, we can still start from this while loop which is always correct
             X, y = [], []
-            sample_list = []
+            
             # Generate batch_size samples.
             for _ in range(batch_size): 
                 # Reset to be safe.
@@ -177,7 +177,7 @@ class DataSet():
                 
                 # Get a random sample.
                 sample = random.choice(data)
-                sample_list.append(sample)
+                
             
                 # Check to see if we've already saved this sequence.
                 if data_type is "images":
@@ -194,10 +194,63 @@ class DataSet():
                     if sequence is None:
                         raise ValueError("Can't find sequence. Did you generate them?")
 
-                X.append(sequence)
-                y.append(self.get_class_one_hot(sample[1]))
-
+                if regression == 0:
+                    X.append(sequence)
+                    y.append(self.get_class_one_hot(sample[1]))
+                elif regression == 1:
+                    s1 = sequence[0];s2 = sequence[9]
+                    ss = np.concatenate((s1,s2)).reshape(2,s1.shape[0])
+                    
+                    X.append(ss)
+                    EF = float(sample[2].split('_')[-1])
+                    y.append(EF)
+                else:
+                    print('Error!!!!!')    
+            
             yield np.array(X), np.array(y)
+
+    
+
+    def predict_generator(self, sample, data_type,regression):
+        """Return a generator that we can use to predict. Every time just load one data needed to be predicted:
+        data_type: 'features', 'images'
+        """
+      
+        print("Creating generator for %s as %s." % (sample[2], sample[1]))
+
+        while 1: # it means next time, we can still start from this while loop which is always correct
+            X, y = [], []
+            for _ in range(1):
+                sequence = None
+                if data_type is "images":
+                    # Get and resample frames.
+                    frames = self.get_frames_for_sample(sample)
+                    # frames = self.rescale_list(frames, self.seq_length)  ### change
+
+                    # Build the image sequence
+                    sequence = self.build_image_sequence(frames)
+                else:
+                    # Get the sequence from disk.
+                    sequence = self.get_extracted_sequence(data_type, sample)
+
+                    if sequence is None:
+                        raise ValueError("Can't find sequence. Did you generate them?")
+
+                if regression == 0:
+                    X.append(sequence)
+                    y.append(self.get_class_one_hot(sample[1]))
+                elif regression == 1:
+                    s1 = sequence[0];s2 = sequence[9]
+                    ss = np.concatenate((s1,s2)).reshape(2,s1.shape[0])
+                    
+                    X.append(ss)
+                    EF = float(sample[2].split('_')[-1])
+                    y.append(EF)
+                else:
+                    print('Error!!!!!')   
+            yield np.array(X), np.array(y)
+
+            
 
     def build_image_sequence(self, frames):
         """Given a set of frames (filenames), build our sequence."""

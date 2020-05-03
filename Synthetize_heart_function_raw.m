@@ -9,7 +9,7 @@ load('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/Matla
 %%
 clear point_list
 patient_num = 1;
-patient_class = "ucsd_bivent";
+patient_class = "ucsd_toshiba";
 [p_class,p_id] = find_patient(patient_list,patient_class,patient_num);
 fr = 0;
 image_name = ['/Volumes/McVeighLab/projects/Zhennong/AI/AI_datasets/',p_class,'/',p_id,'/seg-nii/',num2str(fr),'.nii.gz'];
@@ -61,7 +61,7 @@ info.mesh_thresh = 0.5; %Threshold for cleaning up post runnning the averaging f
 fv = Mesh_Extraction(I,info,print);
 
 disp('Done Extracting the mesh');
-close all
+%close all
 clear print
 %% Infarct Model
 clear infarct

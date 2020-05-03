@@ -22,6 +22,38 @@ batch size = 32
 epoch = 100
 
 Result:
-trainig_accuracy achieves 1 at epoch 44
-validation_accuracy achieves highest value as 0.98 at epoch 31.
+trainig_accuracy achieves 1 at epoch 45
+validation_accuracy achieves highest value as 0.98 at epoch 32.
+
+Data2 (saved in /data2 folder): 
+normal = 50-70% EF, abnormal = 10-40% EF
+for each patient, 5 normal and 5 abnormal
+Result:
+trainig_accuracy achieves 1 at epoch 139
+validation_accuracy achieves highest value as 0.95 at epoch 196.
+Looking into validation set:
+accuracy = 0.94, sensitivity = 0.91, specificity = 0.97
+
+====================================================================================\
+LSTM regression for EF prediction:
+Network design: 
+model.add(LSTM(2048, activation='tanh',recurrent_activation='sigmoid',
+                    return_sequences=False, # 2048 = the units, which is the diemnsionality of the output space. It should be equal to input dimension since each input gets one corresponding ouput
+                    input_shape=self.input_shape,
+                    dropout=0.5))
+        model.add(Dense(512, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(1, activation='relu'))
+metric: MAE
+
+Hyperparameter choice :
+learning rate = 1e-4 and decay = 1e-5 for adam optimizer
+batch size = 32
+epoch = 100
+
+Result: train_loss = 4.57 in epoch 148, val_loss = 3.42 in epoch 197
+
+
 

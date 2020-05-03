@@ -36,9 +36,9 @@ for m in movie_list:
     else:
         patient_class = full_name.split('_')[0] + '_' + full_name.split('_')[1]
     
-    if ef <= 30:
+    if ef <= 40:
         n = 'abnormal'
-    elif ef >= 70:
+    elif ef >= 50:
         n = 'normal'
     else:
         print('Error EF!')
