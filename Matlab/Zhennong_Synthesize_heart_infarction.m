@@ -16,10 +16,10 @@ addpath('/Users/zhennongchen/Documents/GitHub/Synthesize_heart_function_movie/an
 % patient_class: "ucsd_toshiba", patient_num = 1~21
 load('patient_list.mat')
 % siemens 11 304225 can not generate infarction
-for patient_num = 6:17
+for patient_num = 1
     clear Mesh base_lim fv info E smoothing iii point_list Reading_image_size infarct
 
-patient_class = "ucsd_bivent";
+patient_class = "ucsd_toshiba";
 
 
 % get the patient_class, p_class and patient_id, p_id
@@ -80,7 +80,7 @@ disp('Done Extracting the mesh');
 close all
 clear print
 
-for jj = 1:6
+for jj = 1
     clear infarct point_list Mesh
 % Infarct Model
 
@@ -106,6 +106,8 @@ elseif jj==3 || jj==4
 else
     severity = rand()*0.2+0;
 end
+
+
 disp(severity)
 
 if info.infarct
@@ -176,6 +178,7 @@ close all
 
 info.ef_normal = 70; % Computed from Blender
 info.ef_desired = rand()*10 + 70;
+
 info.EF = info.ef_desired/info.ef_normal; % 1 - Normal EF; 0 - No EF
 disp(info.ef_desired)
   
@@ -192,7 +195,7 @@ if info.infarct == 1
 else
     for iii = 1:info.tf
      [Mesh.Vertices(:,:,iii), base_lim(iii), Mesh.NoSmooth_Verts(:,:,iii)] = Strain_Model(fv,info,E,smoothing,iii);
-    end
+    en
 end    
 
 Mesh.Vertices(:,:,1) = round(Mesh.Vertices(:,:,1)); %Very small discrepancy between the vertices saved from pap muscle deletion and raw vertex coordinates from isosurface
@@ -236,7 +239,7 @@ end
 end
     disp(['done patient num ',num2str(patient_num)])
 end
-%
+%% ================
 for patient_num = 1:19
     clear Mesh base_lim fv info E smoothing iii point_list Reading_image_size infarct
 
