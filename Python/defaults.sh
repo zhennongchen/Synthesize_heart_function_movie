@@ -5,5 +5,5 @@ export CG_NAS_PATIENT="/Data/McVeighLabSuper/projects/Zhennong/AI/CNN/all-classe
 
 
 # OCTOMORE
-export CG_OCT_MAIN="/Experiment/Documents/Video_Data/Synthetic_EF_2/"
+export CG_LOCAL="/Data/local_storage/Zhennong/Video_Data/Synthesized_EF_movie/"
 export CUDA_VISIBLE_DEVICES="0"
