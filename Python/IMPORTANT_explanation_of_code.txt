@@ -1,0 +1,10 @@
+the order to run codes:
+- pre_copy_to_octomore.py
+- pre_assign_classes.py
+- pre_partition_data.py
+
+then
+main_1
+main_2
+./main_3_train.py --batch N
+./main_4_validation.py --batch N

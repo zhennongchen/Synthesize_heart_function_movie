@@ -1,20 +1,19 @@
-"""
-After copying all the files using the 3_move_file, we run this one to extract
-the images from the videos and also create a data file we can use
-for training and testing later.
-"""
+#!/usr/bin/env python
+
+# this script can extract time frame into jpg images
+
 import csv
 import cv2
-import math
 import glob
 import os
-import os.path
+import pandas as pd
+import math
 from subprocess import call
 import settings
 import function_list as ff
 cg = settings.Experiment() 
 
-def extract_files(main_path):
+def extract_timeframes(main_path,movie_path,excel_file):
     """After we have all of our videos split between train and test, and
     all nested within folders representing their classes, we need to
     make a data file that we can reference when training our RNN(s).
@@ -24,119 +23,73 @@ def extract_files(main_path):
     We'll first need to extract images from each of the videos. We'll
     need to record the following data in the file:
 
-    [train|test], class, filename, nb frames
+    [train|test] or batch, class, filename, nb frames
 
     Extracting can be done with ffmpeg:
     `ffmpeg -i video.mpg image-%04d.jpg`
     """
-    data_file = []
-    folders = ['train', 'test']
+    data =[]
 
     # create image folder
-    train_image_f = os.path.join(main_path,'train_image')
-    test_image_f = os.path.join(main_path,'test_image')
-    ff.make_folder([train_image_f,test_image_f])
+    image_folder = os.path.join(main_path,'images')
+    ff.make_folder([image_folder])
 
-    for folder in folders:
-        class_folders = glob.glob(os.path.join(main_path,folder, '*'))
-        
-        for vid_class in class_folders:
-           
-            class_files = glob.glob(os.path.join(vid_class, '*.avi'))
+    # find all the movies
+    excel_file = pd.read_excel(excel_file)
+    movie_list = excel_file['video_name']
 
-            for video_path in class_files:
-                # Get the parts of the file.
-                
-                video_parts = get_video_parts(video_path,full_length=True)
+    # extract time frames from each movie:
+    for i in range(0,excel_file.shape[0]):
+        case = excel_file.iloc[i]
+        print(i, case['video_name'])
 
-                train_or_test, classname, filename_no_ext, filename = video_parts
-                print(train_or_test,classname,filename_no_ext,filename)
+        # set the file name for images
+        file_name = case['video_name']
+        file_name_sep = file_name.split('.') # remove .avi
+        file_name_no_ext = file_name_sep[0]
+        if len(file_name_sep) > 1:
+            for ii in range(1,len(file_name_sep)-1):
+                file_name_no_ext += '.'
+                file_name_no_ext += file_name_sep[ii]
+        save_folder = os.path.join(image_folder,file_name_no_ext)
+        ff.make_folder([save_folder])
 
-                # check whether the folder to save images has been created
-                if not os.path.exists(os.path.join(main_path,train_or_test+'_image', classname)):
-                    print("Creating folder for %s/%s" % (train_or_test+'_image', classname))
-                    os.makedirs(os.path.join(main_path,train_or_test+'_image', classname))
+        src = os.path.join(movie_path,file_name)
+        if os.path.isfile(src) == 0:
+            ValueError('no movie file')
 
-                # Only extract if we haven't done it yet. Otherwise, just get
-                # the info.
+        if os.path.isfile(os.path.join(save_folder,file_name_no_ext+'-0001.jpg')) == 0:
+            cap = cv2.VideoCapture(src)
+            count = 1
+            frameRate = 1
+            while(cap.isOpened()):
+                frameId = cap.get(1) # current frame number
+                ret, frame = cap.read()
+                            
+                if (ret != True):
+                    break
+                if (frameId % math.floor(frameRate) == 0):
+                    if count < 10:
+                        number = '000'+str(count)
+                    if count >=10:
+                        number = '00'+str(count)
 
-                if not check_already_extracted(video_parts,main_path):
-                    #Now extract it.
-                    print("%s not exist, extract"%filename)
-                    src = os.path.join(main_path,train_or_test, classname, filename)
+                dest = os.path.join(save_folder,file_name_no_ext+'-'+number+'.jpg')
+                cv2.imwrite(dest,frame)
+                count += 1
+            cap.release()
+            # call(["ffmpeg", "-i", src, dest]) % this will cause some error (not extract exact 20 frames) in some avis
+            
+            
+        # Now get how many frames it is.
+        nb_frames = len(ff.find_all_target_files(['*.jpg'],save_folder))
+        data.append([case['video_name'],file_name_no_ext,nb_frames])
 
-                    cap = cv2.VideoCapture(src)
-                    count = 1
-                    frameRate = 1
-                    while(cap.isOpened()):
-                        frameId = cap.get(1) # current frame number
-                        ret, frame = cap.read()
-                        
-                        if (ret != True):
-                            break
-                        if (frameId % math.floor(frameRate) == 0):
-                            if count < 10:
-                                n = '000'+str(count)
-                            if count >=10:
-                                n = '00'+str(count)
+    print('done extraction')
+    data_df = pd.DataFrame(data,columns = ['video_name','video_name_no_ext','nb_frames'])
+    data_file = pd.merge(excel_file,data_df,on = "video_name")
+    data_file.to_excel(os.path.join(cg.nas_main_dir,'data_file.xlsx'),index=False)
 
-                        dest = os.path.join(main_path,train_or_test+'_image',classname,filename_no_ext+'-'+n+'.jpg')
-                        cv2.imwrite(dest,frame)
-                        count += 1
-                    cap.release()
-                    # call(["ffmpeg", "-i", src, dest]) % this will cause some error (not extract exact 20 frames) in some avis
-
-
-                
-                # Now get how many frames it is.
-                nb_frames = get_nb_frames_for_video(video_parts,main_path)
-
-                data_file.append([train_or_test, classname, filename_no_ext, nb_frames])
-                
-                print("Generated %d frames for class %s, filename %s" % (nb_frames, classname, filename_no_ext))
-                
-
-    excel_file = os.path.join(main_path,'data_file.csv')
-    with open(excel_file, 'w') as fout:
-         writer = csv.writer(fout)
-         writer.writerows(data_file)
-
-    print("Extracted and wrote %d video files." % (len(data_file)))
-
-
-def get_nb_frames_for_video(video_parts,main_path):
-    """Given video parts of an (assumed) already extracted video, return
-    the number of frames that were extracted."""
-    train_or_test, classname, filename_no_ext, _ = video_parts
-    generated_files = glob.glob(os.path.join(main_path,train_or_test+'_image', classname,
-                                filename_no_ext + '-*.jpg'))
-    return len(generated_files)
-
-def get_video_parts(video_path,full_length=True):
-    """Given a full path to a video, return its parts."""
-    parts = video_path.split(os.path.sep)
-    if full_length == False:
-        filename = parts[2]
-        filename_no_ext = filename.split('.')[0]
-        classname = parts[1]
-        train_or_test = parts[0]
-    else:
-        filename = parts[-1]
-        if filename.count('.') == 2:
-            filename_no_ext = filename.split('.')[0] + '.' + filename.split('.')[1].split('%')[0]
-        elif filename.count('.') == 1:   # in case the EF is an integer
-            filename_no_ext = filename.split('.')[0].split('%')[0]
-        else:
-            print('Error on dot number!!')
-        classname = parts[-2]
-        train_or_test = parts[-3]
-    return train_or_test, classname, filename_no_ext, filename
-
-def check_already_extracted(video_parts,main_path):
-    """Check to see if we created the -0001 frame of this file."""
-    train_or_test, classname, filename_no_ext, _ = video_parts
-    return bool(os.path.exists(os.path.join(main_path,train_or_test+'_image', classname,
-                               filename_no_ext + '-0001.jpg')))
 
 def main():
     """
@@ -145,8 +98,10 @@ def main():
 
     [train|test], class, filename, nb frames
     """
-    main_path = os.path.join(cg.oct_main_dir)
-    extract_files(main_path)
+    main_path = cg.local_dir
+    movie_path = os.path.join(main_path,'original_movie')
+    excel_file = os.path.join(cg.nas_main_dir,'movie_list_w_classes.xlsx')
+    extract_timeframes(main_path,movie_path,excel_file)
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''this script transfers files from NAS to octomore'''
+'''this script transfers video files from NAS drive to octomore'''
 
 import glob
 import os
@@ -16,7 +16,7 @@ movie_list = ff.find_all_target_files(['*avi'],nas_movie_folder)
 print(movie_list.shape)
 
 # make folder in octomore
-local_folder = os.path.join(cg.oct_main_dir,'raw_movie')
+local_folder = os.path.join(cg.local_dir,'original_movie')
 ff.make_folder([local_folder])
 
 # copy to octomore

@@ -2,6 +2,7 @@
 Class for managing our data.
 """
 import csv
+import pandas as pd
 import numpy as np
 import random
 import glob
@@ -9,7 +10,7 @@ import os.path
 import sys
 import operator
 import threading
-from processor import process_image
+from util_processor import process_image
 from keras.utils import to_categorical
 import settings
 import function_list as ff
@@ -35,15 +36,16 @@ def threadsafe_generator(func):
 
 class DataSet():
 
-    def __init__(self, seq_length=20, class_limit=None, image_shape=(224, 224, 3)):
+    def __init__(self, validation_batch, seq_length=20, class_limit=None, image_shape=(224, 224, 3)):
         """Constructor.
         seq_length = (int) the number of frames to consider
         class_limit = (int) number of classes to limit the data to.
             None = no limit.
         """
+        self.validation_batch = validation_batch
         self.seq_length = seq_length
         self.class_limit = class_limit
-        self.sequence_path = os.path.join(cg.oct_main_dir, 'sequences')
+        self.sequence_path = os.path.join(cg.local_dir,'sequences')
         self.max_frames = 300  # max number of frames a video can have for us to use it
 
         # Get the data.
@@ -60,19 +62,18 @@ class DataSet():
     @staticmethod
     def get_data():
         """Load our data from file."""
-        with open(os.path.join(cg.oct_main_dir, 'data_file.csv'), 'r') as fin:
-            reader = csv.reader(fin)
-            data = list(reader)
-
+        data = pd.read_excel(os.path.join(cg.nas_main_dir,'data_file.xlsx'))
         return data
 
     def clean_data(self):
         """Limit samples to greater than the sequence length and fewer
         than N frames. Also limit it to classes we want to use."""
         data_clean = []
-        for item in self.data:
-            if int(item[3]) >= self.seq_length and int(item[3]) <= self.max_frames \
-                    and item[1] in self.classes:
+        D = self.data
+        for i in range(0,D.shape[0]):
+            item = D.iloc[i]
+            if int(item['nb_frames']) >= self.seq_length and int(item['nb_frames']) <= self.max_frames \
+                    and item['class'] in self.classes:
                 data_clean.append(item)
 
         return data_clean
@@ -81,9 +82,11 @@ class DataSet():
         """Extract the classes from our data. If we want to limit them,
         only return the classes we need."""
         classes = []
-        for item in self.data:
-            if item[1] not in classes:
-                classes.append(item[1])
+        D = self.data
+        for i in range(0,D.shape[0]):
+            item = D.iloc[i]
+            if item['class'] not in classes:
+                classes.append(item['class'])
 
         # Sort them.
         classes = sorted(classes)
@@ -108,54 +111,55 @@ class DataSet():
         return label_hot
 
     def split_train_test(self):
-        """Split the data into train and test groups."""
+        """Split the data into train and test groups based on the batch choice. In the data_file.xlsx, each movie has a column labeling the batch"""
+        
         train = []
         test = []
         for item in self.data:
-            if item[0] == 'train':
+            if item['batch'] != self.validation_batch:
                 train.append(item)
             else:
                 test.append(item)
         return train, test
 
-    def get_all_sequences_in_memory(self, train_test, data_type):
-        """
-        This is a mirror of our generator, but attempts to load everything into
-        memory so we can train way faster.
-        """
-        # Get the right dataset.
-        train, test = self.split_train_test()
-        data = train if train_test == 'train' else test
+    # def get_all_sequences_in_memory(self, train_test, data_type):
+    #     """
+    #     This is a mirror of our generator, but attempts to load everything into
+    #     memory so we can train way faster.
+    #     """
+    #     # Get the right dataset.
+    #     train, test = self.split_train_test()
+    #     data = train if train_test == 'train' else test
 
-        print("Loading %d samples into memory for %sing." % (len(data), train_test))
+    #     print("Loading %d samples into memory for %sing." % (len(data), train_test))
 
-        X, y = [], []
-        for row in data:
+    #     X, y = [], []
+    #     for row in data:
 
-            if data_type == 'images':
-                frames = self.get_frames_for_sample(row)
-                frames = self.rescale_list(frames, self.seq_length)
+    #         if data_type == 'images':
+    #             frames = self.get_frames_for_sample(row)
+    #             frames = self.rescale_list(frames, self.seq_length)
 
-                # Build the image sequence
-                sequence = self.build_image_sequence(frames)
+    #             # Build the image sequence
+    #             sequence = self.build_image_sequence(frames)
 
-            else:
-                sequence = self.get_extracted_sequence(data_type, row)
+    #         else:
+    #             sequence = self.get_extracted_sequence(data_type, row)
 
-                if sequence is None:
-                    print("Can't find sequence. Did you generate them?")
-                    raise
+    #             if sequence is None:
+    #                 print("Can't find sequence. Did you generate them?")
+    #                 raise
 
-            X.append(sequence)
-            y.append(self.get_class_one_hot(row[1]))
+    #         X.append(sequence)
+    #         y.append(self.get_class_one_hot(row[1]))
 
-        return np.array(X), np.array(y)
+    #     return np.array(X), np.array(y)
 
     @threadsafe_generator
     # Generator is not a collection, it stops with yield and returns to where it was left in the next call. 
     # Thus, it does not requires the use of a lot of memory. 
     # def + yield = generator; generator = def_name(); then use next(generator) to call generator'''
-    def frame_generator(self, batch_size, train_test, data_type,regression):
+    def frame_generator(self, batch_size, train_test, data_type,regression,shuffle):
         """Return a generator that we can use to train on. There are
         a couple different things we can return:
 
@@ -167,18 +171,44 @@ class DataSet():
       
         print("Creating %s generator with %d samples." % (train_test, len(data)))
 
-        while 1: # it means next time, we can still start from this while loop which is always correct
-            X, y = [], []
+        ###########!!! use index array to do the generator
+        N = len(data)
+        batch_index = 0
+        total_round_seen = 0
+        seed = random.randint(0,50)
+
+        while True: # it means next time, we can still start from this while loop which is always correct
+            
+            if batch_index == 0:
+                if shuffle:
+                    if seed is not None:
+                        np.random.seed(seed + total_round_seen)
+                        print('seed is: ', seed+total_round_seen * 3)
+                    print('now shuffle')
+                    index_array = np.random.permutation(N)
+                else:
+                    index_array = np.asarray(range(0,N))
+                
+            current_index = (batch_index * batch_size) % N
+            if N >= current_index + batch_size:
+                current_batch_size = batch_size
+                batch_index += 1
+            else:
+                current_batch_size = N - current_index
+                batch_index = 0
+                total_round_seen += 1
+
+            index_array_current_batch = index_array[current_index : current_index + current_batch_size]
             
             # Generate batch_size samples.
-            for _ in range(batch_size): 
+            X, y = [], []
+            for ii in index_array_current_batch: 
                 # Reset to be safe.
                 sequence = None
                 
-                # Get a random sample.
-                sample = random.choice(data)
-                
-            
+                # get the sample
+                sample = data[ii]
+
                 # Check to see if we've already saved this sequence.
                 if data_type is "images":
                     # Get and resample frames.
@@ -196,17 +226,19 @@ class DataSet():
 
                 if regression == 0:
                     X.append(sequence)
-                    y.append(self.get_class_one_hot(sample[1]))
+                    y.append(self.get_class_one_hot(sample['class']))
+
                 elif regression == 1:
-                    s1 = sequence[0];s2 = sequence[9]
+                    s1 = sequence[0];s2 = sequence[(self.seq_length//2) - 1 + 0]
                     ss = np.concatenate((s1,s2)).reshape(2,s1.shape[0])
                     
                     X.append(ss)
-                    EF = float(sample[2].split('_')[-1])
-                    y.append(EF)
+                    #EF = float(sample[’].split('_')[-1])
+                    y.append(float(sample['EF']))
+
                 else:
                     print('Error!!!!!')    
-            
+        
             yield np.array(X), np.array(y)
 
     
@@ -216,9 +248,9 @@ class DataSet():
         data_type: 'features', 'images'
         """
       
-        print("Creating generator for %s as %s." % (sample[2], sample[1]))
+        print("Creating generator for %s as %s." % (sample['video_name_no_ext'], sample['class']))
 
-        while 1: # it means next time, we can still start from this while loop which is always correct
+        while True: # it means next time, we can still start from this while loop which is always correct
             X, y = [], []
             for _ in range(1):
                 sequence = None
@@ -238,16 +270,16 @@ class DataSet():
 
                 if regression == 0:
                     X.append(sequence)
-                    y.append(self.get_class_one_hot(sample[1]))
+                    y.append(self.get_class_one_hot(sample['class']))
+
                 elif regression == 1:
                     s1 = sequence[0];s2 = sequence[9]
                     ss = np.concatenate((s1,s2)).reshape(2,s1.shape[0])
-                    
                     X.append(ss)
-                    EF = float(sample[2].split('_')[-1])
-                    y.append(EF)
+                    y.append(float(sample['EF']))
                 else:
                     print('Error!!!!!')   
+            
             yield np.array(X), np.array(y)
 
             
@@ -258,7 +290,7 @@ class DataSet():
 
     def get_extracted_sequence(self, data_type, sample):
         """Get the saved extracted features."""
-        filename = sample[2]
+        filename = sample['video_name_no_ext']
         path = os.path.join(self.sequence_path, filename + '-' + str(self.seq_length) + \
             '-' + data_type + '.npy')
         if os.path.isfile(path):
@@ -295,13 +327,12 @@ class DataSet():
 
     @staticmethod
     def get_frames_for_sample(sample):
-        """Given a sample row from the data file, get all the corresponding frame
-        filenames."""
-        path = os.path.join(cg.oct_main_dir, sample[0]+'_image', sample[1])
         
-        filename = sample[2]
+        path = os.path.join(cg.local_dir, 'images', sample['video_name_no_ext'])
+        
+        files = ff.find_all_target_files(['*.jpg'],path)
       
-        images = sorted(glob.glob(os.path.join(path, filename + '-*jpg')))
+        images = sorted(files)
         
         return images
 

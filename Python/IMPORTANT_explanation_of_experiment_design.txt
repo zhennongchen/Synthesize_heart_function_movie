@@ -25,12 +25,16 @@ Result:
 trainig_accuracy achieves 1 at epoch 45
 validation_accuracy achieves highest value as 0.98 at epoch 32.
 
-Data2 (saved in /data2 folder): 
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: modified on 04/02/2021
+!Data2 (saved in /data2 folder, use this one):
 normal = 50-70% EF, abnormal = 10-40% EF
 for each patient, 5 normal and 5 abnormal
+seperate the dataset into 5 batches based on the patient
+
 Result:
-trainig_accuracy achieves 1 at epoch 139
-validation_accuracy achieves highest value as 0.95 at epoch 196.
+trainig_accuracy achieves 1 as highest
+validation_accuracy achieves highest value as 0.987 at epoch 108.
 Looking into validation set:
 accuracy = 0.94, sensitivity = 0.91, specificity = 0.97
 

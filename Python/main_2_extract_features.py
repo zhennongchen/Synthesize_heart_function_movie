@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+# this script uses a pre-trained CNN ("Inception v3") to extract image feature from the image of each time frame. then anneal
+# into a feature sequence.
+
 """
 This script generates extracted features for each video, which other
 models make use of.
@@ -17,43 +22,52 @@ for each time frame, (2048,0) is the dimension of features extracted.
 '''
 import numpy as np
 import os
-from data import DataSet
-from extractor import Extractor
+from util_data import DataSet
+from util_extractor import Extractor
 from tqdm import tqdm
 import settings
 import function_list as ff
 cg = settings.Experiment() 
-main_path = os.path.join(cg.oct_main_dir)
+main_path = cg.local_dir
+
 # Set defaults.
 seq_length = 20
 class_limit = None  # Number of classes to extract. Can be 1-101 or None for all.
 
 # Get the dataset.
-data = DataSet(seq_length=seq_length, class_limit=class_limit)
+data = DataSet(validation_batch = 0, seq_length=seq_length, class_limit=class_limit)
 
 # get the model.
 model = Extractor()
 
 # get a folder for sequence save
-os.makedirs(os.path.join(main_path,'sequences'),exist_ok=True)
+ff.make_folder([os.path.join(main_path,'sequences')])
 
 # Loop through data.
 pbar = tqdm(total=len(data.data))
-for video in data.data:
+for case in data.data:
+
+    file_name = case['video_name']
+    file_name_sep = file_name.split('.') # remove .avi
+    file_name_no_ext = file_name_sep[0]
+    if len(file_name_sep) > 1:
+        for ii in range(1,len(file_name_sep)-1):
+            file_name_no_ext += '.'
+            file_name_no_ext += file_name_sep[ii]
     
     # Get the path to the sequence for this video.
-    path = os.path.join(main_path, 'sequences', video[2] + '-' + str(seq_length) + \
-        '-features')  # numpy will auto-append .npy
+    path = os.path.join(main_path, 'sequences', file_name_no_ext + '-' + str(seq_length) + \
+        '-features.npy')  # numpy will auto-append .npy
  
 
     # Check if we already have it.
-    if os.path.isfile(path + '.npy'):
+    if os.path.isfile(path):
         pbar.update(1)
         continue
 
     # Get the frames for this video.
-    frames = data.get_frames_for_sample(video)
-    
+    frames = data.get_frames_for_sample(case)
+
   
     # Now downsample to just the ones we need.
     #frames = data.rescale_list(frames, seq_length)
@@ -63,11 +77,13 @@ for video in data.data:
     for image in frames:
         features = model.extract(image)
         sequence.append(features)
-  
+    sequence = np.asarray(sequence)
+
     # Save the sequence.
     np.save(path, sequence)
 
     pbar.update(1)
+
    
     
     
